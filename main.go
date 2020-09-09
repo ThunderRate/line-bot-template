@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net"
 	"net/http"
@@ -25,7 +26,11 @@ func exit(err error) {
 func init() {
 	viper.SetConfigName(".env")
 	viper.SetConfigType("env")
-	viper.AddConfigPath(".")
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		configDir = "."
+	}
+	viper.AddConfigPath(configDir)
 	if err := viper.ReadInConfig(); err != nil {
 		exit(err)
 	}
@@ -37,11 +42,30 @@ func main() {
 		exit(err)
 	}
 	addr := net.JoinHostPort(viper.GetString("Host"), viper.GetString("Port"))
+	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/callback", callbackHandler)
 	if err = http.ListenAndServe(addr, nil); err != nil {
 		exit(err)
 	}
 	exit(nil)
+}
+
+// Response represent struct for api response
+type Response struct {
+	Success bool              `json:"success"`
+	Message string            `json:"message"`
+	Error   map[string]string `json:"error,omitempty"`
+}
+
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	response := Response{
+		Success: true,
+		Message: "ok",
+	}
+	res, _ := json.Marshal(response)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	w.Write(res)
 }
 
 func callbackHandler(w http.ResponseWriter, r *http.Request) {
